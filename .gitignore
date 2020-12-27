@@ -1,0 +1,8 @@
+build.inc
+*.num
+date.inc
+bios.inc
+kernel.inc
+*.prg
+*.lst
+*.rom

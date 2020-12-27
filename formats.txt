@@ -1,0 +1,109 @@
+Object file:
+------------
+Object files are used as output from the assembler or compilers.  It is an
+intermediate format that needs to be linked to produce an actual executable.
+The object file is divided into records, defined below:
+
+  Stat Record:
+  ------------
+  Byte     Meaning
+  0        Record type.  =0 to indicate a stat record
+  1..2     Minimum load address for enclosed code/data blocks
+  3..4     Maximum load address for enclosed code/data blocks
+  5..6     Minimum allowed address for relocatable blocks
+  7..8     Maximum allowed address for relocatable blocks
+
+  Code Record:
+  ------------
+  Size     Meaning
+  1        Record type.  =1 to indicate a code record
+  2        Size of record, including record header
+  2        Load address of record (65535=relocatable data record)
+  2        Size of symbol table
+  nSt      Symbol table for block
+  2        Size of external dependency table
+  nEdt     External dependency table
+  2        Size of relocatable page table
+  nRpt     Relocatable page table
+  2        Size of code block
+  rCb      Code bytes
+
+  Data Record:
+  ------------
+  Byte   Meaning
+  0      Record type.  =2 to indicate a data record
+  1..2   Size of record, including record header
+  3..4   Load address of record (65535=relocatable data record)
+  5..n   Data bytes
+
+  Execution Record:
+  -----------------
+  Byte   Meaning
+  0      Record type.  = 3 to indicate execution record
+  1..2   Sizeo of record, including header (5)
+  3..4   Execution address
+
+  Misc Record:
+  ------------
+  Byte   Meaning
+  0      Record type.  =254 to indicate misc record
+  1..2   Size of record, including record header
+  3..n   Data bytes
+
+
+  Termination Record:
+  -------------------
+  Byte   Meaning
+  0      Record type.  =255 to indicate termination record
+
+  Symbol Table:
+  -------------
+  asciiz of symbol name (0 if no more entries)
+  2 bytes inidicating offset in code block of symbol
+
+  External Dependency Table:
+  --------------------------
+  asciiz of external name (0 if no more entries)
+  2 bytes inidicating offset in code block of symbol reference
+
+  Relocatable page table:
+  -----------------------
+  Each entry is 2 bytes which is the offset to the page entry that needs
+  to be changed
+
+Library File:
+-------------
+Library files contain collections of object files that can be used by the
+linker.  The library file is divided into records:
+
+  Version Record:
+  ---------------
+  Byte      Meaning
+  0         Record type.  =0 to indicate version record
+  1         Major version number
+  2         Minor version number
+  3         Patch level
+  4         Month
+  5         Day
+  6..7      Year
+  
+  Object Record:
+  --------------
+  Byte      Meaning
+  0         Record type.  = 1 to indicate an object record
+  1..2      Size of object name
+  3..n      Object name (asciiz)
+  n+1..n+2  Size of oject
+  n+3..n+n  Object data (same format as object file)
+
+  Misc Record:
+  ------------
+  Byte      Meaning
+  0         Record type.  =254 to inidcate misc record
+  1..2      Size of record, including record header
+  3..n      Data bytes
+
+  Termination Record:
+  -------------------
+  Byte      Meaning
+  0         Record type.  =255 to indicate termination record
