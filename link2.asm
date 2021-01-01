@@ -12,8 +12,8 @@ include kernel.inc
            org     8000h
            lbr     0ff00h
            db      'link2',0
-           dw      0a000h
-           dw      endrom+0a000h-2000h
+           dw      0b000h
+           dw      endrom+0b000h-2000h
            dw      2000h  
            dw      endrom-2000h  
            dw      2000h  

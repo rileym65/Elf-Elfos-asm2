@@ -6,8 +6,12 @@
 ; *** without express written permission from the author.         ***
 ; *******************************************************************
 
+#define CDP1805
+
 include bios.inc
 include kernel.inc
+
+flg_1805:  equ     1
 
            org     8000h
            lbr     0ff00h
@@ -201,13 +205,42 @@ start:     lda     ra                  ; move past any spaces
            smi     ' '
            lbz     start
            dec     ra                  ; point back to non-space character
-           ldn     ra                  ; check if no args
-           lbnz    start1              ; jump if args given
-           sep     scall               ; otherwise display usage
+           mov     rf,flags            ; point to flags storage
+           ldi     0                   ; initially set no flags
+           plo     r7
+arglp:     lda     ra                  ; get byte from command line
+           lbz     nofile              ; jump if end of command line
+           plo     re                  ; save copy of byte
+           smi     ' '                 ; check for space
+           lbz     arglp               ; jump if so
+           glo     re                  ; recover byte
+           smi     '-'                 ; check for flag symbol
+           lbnz    start1a             ; jump if not flag symbol
+           lda     ra                  ; read flag byte
+           plo     re                  ; save a copy
+           smi     '5'                 ; check for allow 1805 instructions
+           lbnz    not5                ; jump if not -5
+           glo     r7                  ; recover flags
+           ori     flg_1805            ; set allow 1805 instructions
+           plo     r7                  ; save it again
+           lbr     arglp               ; keep checking args
+not5:      sep     scall               ; display flag error
            dw      f_inmsg
-           db      'Usage: asm2 filename',10,13,0
+           db      'Invalid flag',10,13,0
+           lbr     o_wrmboot
+nofile:    sep     scall               ; otherwise display usage
+           dw      f_inmsg
+           db      'Usage: asm2 [flags] filename',10,13,0
            lbr     o_wrmboot           ; and return to OS
-start1:    ldi     high symtab         ; set 0 pointer into symbol table
+start1a:   dec     ra                  ; move back 1 character
+start1:    lda     ra                  ; move past any remaining spaces
+           lbz     nofile              ; error if end of command line
+           smi     ' '
+           lbz     start1              ; keep looking if space found
+           dec     ra                  ; move back to non-space character
+           glo     r7                  ; get flags
+           str     rf                  ; and save them
+           ldi     high symtab         ; set 0 pointer into symbol table
            phi     rf
            ldi     low symtab
            plo     rf
@@ -1019,16 +1052,38 @@ asmgood:   ldi     0                   ; signal success
 asmfnd:    lda     r9                  ; get instruction type
            smi     1                   ; see if 1 byte code
            lbnz    asmnot1             ; jump if not
-           lda     r9                  ; get opcode
+           ldn     r9                  ; get opcode
            sep     scall               ; output the byte
            dw      output
+           lda     r9                  ; check if 1805 code
+#ifdef CDP1805
+           smi     068h
+           lbnz    asmgood             ; jump if not
+           sep     scall               ; see if 1805 instructions allowed
+           dw      allow1805
+           lbnf    asmerror            ; jump if 1805 not allowed
+           lda     r9                  ; get second code
+           sep     scall               ; and output it
+           dw      output
+#endif
            lbr     asmgood             ; then return
 asmnot1:   smi     1                   ; check for 2 byte instruction
            lbnz    asmnot2             ; jump if not
-           lda     r9                  ; get opcode
+           ldn     r9                  ; get opcode
            sep     scall               ; and output it
            dw      output
-           sep     scall               ; get argument
+           lda     r9                  ; need to check for extended inst
+#ifdef CDP1805
+           smi     068h
+           lbnz    asmnot1_1           ; jump if not extended
+           sep     scall               ; see if 1805 instructions allowed
+           dw      allow1805
+           lbnf    asmerror            ; jump if 1805 not allowed
+           lda     r9                  ; get second byte of opcode
+           sep     scall               ; otherwise output it
+           dw      output
+#endif
+asmnot1_1: sep     scall               ; get argument
            dw      getarg
            lbdf    asmerror            ; jump if error in argument
            glo     rd                  ; get low value
@@ -1063,7 +1118,20 @@ asmnot3:   smi     1                   ; check for special handling
            ldn     r9
            str     r7
 jump:      lbr     0                   ; jump to special routine
-asmnot4:   lda     r9                  ; get opcode
+asmnot4:   smi     1                   ; check for type 6
+           lbnz    asmnot5
+           ldn     r9                  ; get opcode
+#ifdef CDP1805
+           smi     068h                ; check for extended code
+           lbnz    asmnot4_1           ; jump if not
+           sep     scall               ; see if 1805 instructions allowed
+           dw      allow1805
+           lbnf    asmerror            ; jump if 1805 not allowed
+           lda     r9                  ; recover code
+           sep     scall               ; and output it
+           dw      output
+#endif
+asmnot4_1: lda     r9                  ; get opcode
            stxd                        ; and save it
            sep     scall               ; get argument
            dw      getarg
@@ -1075,6 +1143,45 @@ asmnot4:   lda     r9                  ; get opcode
            sep     scall               ; and output it
            dw      output
            lbr     asmgood             ; then return
+asmnot5:   ldn     r9                  ; get opcode
+#ifdef CDP1805
+           smi     068h                ; check for extended code
+           lbnz    asmnot5_1           ; jump if not
+           lda     r9                  ; recover code
+           sep     scall               ; and output it
+           dw      output
+           sep     scall               ; see if 1805 instructions allowed
+           dw      allow1805
+           lbnf    asmerror            ; jump if 1805 not allowed
+#endif
+asmnot5_1: lda     r9                  ; get opcode
+           stxd                        ; and save it
+           sep     scall               ; get argument
+           dw      getarg
+           irx                         ; point to opcode
+           lbdf    asmerror            ; jump if error in argument
+           glo     rd                  ; get low value
+           ani     0fh                 ; keep only low nybble
+           or                          ; and or with register nybble
+           sep     scall               ; and output it
+           dw      output
+           sep     scall               ; move past whitespace
+           dw      f_ltrim
+           ldn     rf                  ; check for a comma
+           smi     ','
+           lbnz    asmerror            ; jump if not
+           inc     rf                  ; move past comma
+           sep     scall               ; get argument
+           dw      getarg
+           lbdf    asmerror            ; jump if error in argument
+           ghi     rd                  ; get high value
+           sep     scall               ; and output it
+           dw      output
+           glo     rd                  ; get low value
+           sep     scall               ; and output it
+           dw      output
+           lbr     asmgood             ; then return
+
 asmerror:  ldi     high errmsg         ; point to error message
            phi     rf
            ldi     low errmsg
@@ -2476,6 +2583,21 @@ touc_qlp:  lda     rf                  ; get next character
            lbz     touc                ; back to main loop if quote
            lbr     touc_qlp            ; otherwise keep looking
 
+allow1805: stxd                        ; save d
+           push    rf                  ; save rf
+           mov     rf,flags            ; point to flags
+           ldn     rf                  ; get flags
+           ani     flg_1805            ; see if 1805 flag is set
+           lbz     no                  ; jump if not
+           lbr     yes                 ; otherwise yes
+no:        adi     0                   ; clear df
+go:        pop     rf                  ; recover rf
+           irx                         ; recover d
+           ldx
+           sep     sret                ; and return to caller
+yes:       smi     0                   ; set df
+           lbr     go                  ; adn return
+        
 
 pstart:    dw      0
 char:      db      0
@@ -2499,6 +2621,17 @@ linenum:   dw      0
 lowmem:    dw      0ffffh
 highmem:   dw      0
 startaddr: dw      0
+flags:     db      0
+
+
+; Instruction types (field 2)
+; 1 - Single byte instruction, no argument
+; 2 - Two byte instruction, single byte argument
+; 3 - Three byte instruction, single word argument
+; 4 - Special handler
+; 5 - Single byte instruction, nybble argument
+; 6 - 3 bytes, 2 arguments, 1-nybble, 2-byte address
+
 insttab:   db      'AD',('D'+80h),1,0f4h,0
            db      'AD',('C'+80h),1,074h,0
            db      'ADC',('I'+80h),2,07ch,0
@@ -2590,6 +2723,40 @@ insttab:   db      'AD',('D'+80h),1,0f4h,0
            dw           opdw
            db      'D',('S'+80h),4
            dw           opds
+#ifdef CDP1805
+           db      'RLD',('I'+80h),6,068h,0c0h
+           db      'RLX',('A'+80h),5,068h,060h
+           db      'RSX',('D'+80h),5,068h,0a0h
+           db      'DBN',('Z'+80h),6,068h,020h
+           db      'RN',('X'+80h),5,068h,0b0h
+           db      'DAD',('D'+80h),1,068h,0f4h
+           db      'DAD',('I'+80h),2,068h,0fch
+           db      'DAD',('C'+80h),1,068h,074h
+           db      'DAC',('I'+80h),2,068h,07ch
+           db      'DS',('M'+80h),1,068h,0f7h
+           db      'DSM',('I'+80h),2,068h,0ffh
+           db      'DSM',('B'+80h),1,068h,077h
+           db      'DSB',('I'+80h),2,068h,07fh
+           db      'BC',('I'+80h),2,068h,03eh
+           db      'BX',('I'+80h),2,068h,03fh
+           db      'LD',('C'+80h),1,068h,006h
+           db      'GE',('C'+80h),1,068h,008h
+           db      'STP',('C'+80h),1,068h,000h
+           db      'DT',('C'+80h),1,068h,001h
+           db      'ST',('M'+80h),1,068h,007h
+           db      'SCM',('1'+80h),1,068h,005h
+           db      'SCM',('2'+80h),1,068h,003h
+           db      'SPM',('1'+80h),1,068h,004h
+           db      'SPM',('2'+80h),1,068h,002h
+           db      'ET',('Q'+80h),1,068h,009h
+           db      'XI',('E'+80h),1,068h,00ah
+           db      'XI',('D'+80h),1,068h,00bh
+           db      'CI',('E'+80h),1,068h,00ch
+           db      'CI',('D'+80h),1,068h,00dh
+           db      'DSA',('V'+80h),1,068h,076h
+           db      'SCA',('L'+80h),6,068h,080h
+           db      'SRE',('T'+80h),5,068h,090h
+#endif
            db      0
 
 endrom:    equ     $
