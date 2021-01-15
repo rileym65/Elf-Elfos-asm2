@@ -225,11 +225,11 @@ arglp:     lda     ra                  ; get byte from command line
            plo     r7                  ; save it again
            lbr     arglp               ; keep checking args
 not5:      sep     scall               ; display flag error
-           dw      f_inmsg
+           dw      o_inmsg
            db      'Invalid flag',10,13,0
            lbr     o_wrmboot
 nofile:    sep     scall               ; otherwise display usage
-           dw      f_inmsg
+           dw      o_inmsg
            db      'Usage: asm2 [flags] filename',10,13,0
            lbr     o_wrmboot           ; and return to OS
 start1a:   dec     ra                  ; move back 1 character
