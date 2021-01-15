@@ -326,7 +326,7 @@ opened1:   sep     scall               ; perform pass 1
            plo     rf
            sep     scall               ; point to output fildes
            dw      setout
-           ldi     3                   ; select create and truncate options
+           ldi     11                  ; select exec, create and truncate options
            plo     r7
            sep     scall               ; and open the output file
            dw      o_open
