@@ -2466,6 +2466,9 @@ tokenlp:   sep     scall               ; move past any whitespace
            dw      f_ltrim
            ldn     rf                  ; check for line terminator
            lbz     tokendn             ; jump if terminator
+           smi     ';'                 ; check for comment character
+           lbz     tokendn             ; stop tokenize if comment
+           ldn     rf
            smi     ','                 ; check for comma
            lbz     tokendn             ; this also terminates the sequence
            ldn     rf                  ; check character constant
@@ -2761,9 +2764,9 @@ insttab:   db      'AD',('D'+80h),1,0f4h,0
 
 endrom:    equ     $
 
-outbuffer: ds      80
+outbuffer: ds      128
 
-buffer:    ds      80
+buffer:    ds      128
 
 address:   ds      2
 
