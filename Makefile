@@ -5,23 +5,23 @@ asm2.rom: asm2.prg link2.prg
 
 $(PROJECT).prg: $(PROJECT).asm bios.inc
 	cp asm2.num build.num
-	../dateextended.pl > date.inc
-	../build.pl > build.inc
+	../../dateextended.pl > date.inc
+	../../build.pl > build.inc
 	cp build.num asm2.num
-	rcasm -l -v -x -d1802 $(PROJECT) 2>&1 | tee $(PROJECT).lst
-	cat $(PROJECT).prg | sed -f asm2.sed > x.prg
-	rm $(PROJECT).prg
-	mv x.prg $(PROJECT).prg
+	asm02 -l -L -DELFOS $(PROJECT).asm
+	mv $(PROJECT).prg x.prg
+	cat x.prg | sed -f asm2.sed > $(PROJECT).prg
+	rm x.prg
 
 link2.prg: link2.asm bios.inc
 	cp link2.num build.num
-	../dateextended.pl > date.inc
-	../build.pl > build.inc
+	../../dateextended.pl > date.inc
+	../../build.pl > build.inc
 	cp build.num link2.num
-	rcasm -l -v -x -d1802 link2 2>&1 | tee link2.lst
-	cat link2.prg | sed -f link2.sed > x.prg
-	rm link2.prg
-	mv x.prg link2.prg
+	asm02 -l -L -DELFOS link2.asm
+	mv link2.prg x.prg
+	cat x.prg | sed -f link2.sed > link2.prg
+	rm x.prg
 
 clean:
 	-rm $(PROJECT).prg

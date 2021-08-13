@@ -8,8 +8,8 @@
 
 #define CDP1805
 
-include bios.inc
-include kernel.inc
+include ../bios.inc
+include ../kernel.inc
 
 flg_1805:  equ     1
 
@@ -227,11 +227,13 @@ arglp:     lda     ra                  ; get byte from command line
 not5:      sep     scall               ; display flag error
            dw      o_inmsg
            db      'Invalid flag',10,13,0
-           lbr     o_wrmboot
+           ldi     09h
+           sep     sret      
 nofile:    sep     scall               ; otherwise display usage
            dw      o_inmsg
            db      'Usage: asm2 [flags] filename',10,13,0
-           lbr     o_wrmboot           ; and return to OS
+           ldi     0ah
+           sep     sret                ; and return to OS
 start1a:   dec     ra                  ; move back 1 character
 start1:    lda     ra                  ; move past any remaining spaces
            lbz     nofile              ; error if end of command line
@@ -608,6 +610,35 @@ opend:     sep     scall               ; get argument
            glo     rd
            str     r8
            lbr     opgood              ; done
+
+; **************************
+; *** Process EQI opcode ***
+; **************************
+opequ:     ldi     high pass           ; get current pass
+           phi     r8
+           ldi     low pass
+           plo     r8
+           ldn     r8
+           lbz     opequ1              ; can only add on first pass
+           sep     sret
+opequ1:    sep     scall               ; get argument
+           dw      getarg
+           ldi     high lastvalue
+           phi     r8
+           ldi     low lastvalue
+           plo     r8
+           lda     r8
+           plo     re
+           ldn     r8
+           plo     r8
+           glo     re
+           phi     r8
+           ghi     rd
+           str     r8
+           inc     r8
+           glo     rd
+           str     r8
+           lbr     opgood
 
 ; **************************
 ; *** Process ORG opcode ***
@@ -1630,6 +1661,18 @@ addsym2:   dec     r8                  ; point back to previous char
            inc     rf
            glo     r8
            str     rf
+           dec     r8                  ; point back to value
+           dec     r8
+           ldi     high lastvalue      ; remember last value field
+           phi     rf
+           ldi     low lastvalue
+           plo     rf
+           ghi     r8
+           str     rf
+           inc     rf
+           glo     r8
+           str     rf
+
            sep     sret                ; return to caller
            
 ; **************************************************
@@ -2616,6 +2659,7 @@ nxtline:   db      10,13,'     ',0
 
 outcount:  db      0
 lastsym:   dw      0
+lastvalue: dw      0
 pass:      db      0
 bytecnt:   db      0
 curaddr:   dw      0
@@ -2726,6 +2770,8 @@ insttab:   db      'AD',('D'+80h),1,0f4h,0
            dw           opdw
            db      'D',('S'+80h),4
            dw           opds
+           db      'EQ',('U'+80h),4
+           dw           opequ
 #ifdef CDP1805
            db      'RLD',('I'+80h),6,068h,0c0h
            db      'RLX',('A'+80h),5,068h,060h

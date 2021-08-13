@@ -6,8 +6,8 @@
 ; *** without express written permission from the author.         ***
 ; *******************************************************************
 
-include bios.inc
-include kernel.inc
+include ../bios.inc
+include ../kernel.inc
 
            org     8000h
            lbr     0ff00h
